@@ -1,0 +1,43 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Local database
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+# Generated retrieval index
+data/policy_index.json
+
+data/evals/results/*
+!data/evals/results/.gitkeep
+!data/evals/results/final_multi_agent.json
+!data/evals/results/final_comparison.json

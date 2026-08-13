@@ -1,0 +1,178 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+    environment:
+      ENVIRONMENT: development
+
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+
+      FRONTEND_ORIGIN: http://localhost:5173
+
+      DATABASE_URL: sqlite:////app/data/app.db
+
+      CRM_BASE_URL: http://crm:8101
+      BILLING_BASE_URL: http://billing:8102
+
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      OPERATOR_EMAILS: ${OPERATOR_EMAILS}
+      ADK_MODEL: gemini-3.6-flash
+      MODEL_TEMPERATURE: 0.1
+      MODEL_TIMEOUT_MS: 30000
+      MODEL_RETRY_ATTEMPTS: 3
+      MAX_LLM_CALLS_PER_RUN: 5
+      MCP_SERVER_URL: http://mcp:8200/mcp
+
+      INVESTIGATION_MAX_LLM_CALLS: 8
+      INVESTIGATOR_MAX_TOOL_CALLS: 8
+
+    volumes:
+      - ./data:/app/data
+
+    ports:
+      - "8000:8000"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+    depends_on:
+      crm:
+        condition: service_healthy
+
+      billing:
+        condition: service_healthy
+
+      mcp:
+        condition: service_healthy
+
+  crm:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+
+    command:
+      [
+        "uvicorn",
+        "simulator.crm.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8101",
+      ]
+
+    ports:
+      - "8101:8101"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8101/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  billing:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+
+    command:
+      [
+        "uvicorn",
+        "simulator.billing.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8102",
+      ]
+
+    ports:
+      - "8102:8102"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8102/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+
+    ports:
+      - "5173:5173"
+
+    environment:
+      VITE_API_URL: http://localhost:8000
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  mcp:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+    command: ["python", "-m", "app.mcp.server"]
+
+    environment:
+      CRM_BASE_URL: http://crm:8101
+      BILLING_BASE_URL: http://billing:8102
+
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8200
+
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+
+      POLICY_DOCUMENTS_DIR: documents/policies
+      POLICY_INDEX_PATH: data/policy_index.json
+
+    volumes:
+      - ./data:/app/data
+
+    ports:
+      - "8200:8200"
+
+    depends_on:
+      crm:
+        condition: service_healthy
+
+      billing:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8200/health')",
+        ]
+
+      interval: 5s
+      timeout: 3s
+      retries: 5
