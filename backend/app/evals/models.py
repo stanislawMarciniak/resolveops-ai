@@ -1,7 +1,15 @@
+from enum import StrEnum
+
 from pydantic import Field
 
 from app.models.base import DomainModel
 from app.state import CaseStage
+
+
+class EvalVariant(StrEnum):
+    MULTI_AGENT = "multi_agent"
+    SINGLE_AGENT = "single_agent"
+    NO_REVIEWER = "no_reviewer"
 
 
 class EvalGroundTruth(DomainModel):
@@ -58,10 +66,13 @@ class EvalCaseResult(DomainModel):
     root_cause_correct: bool | None = None
 
     expected_actions: list[str] | None = None
+
     tags: list[str] = Field(
         default_factory=list,
     )
+
     actual_actions: list[str]
+
     plan_correct: bool | None = None
 
     customer_id_correct: bool | None = None
@@ -85,8 +96,14 @@ class EvalCaseResult(DomainModel):
 
     plan_revision_count: int
 
+    run_error: str | None = None
+
 
 class EvalSummary(DomainModel):
+    variant: EvalVariant = (
+        EvalVariant.MULTI_AGENT
+    )
+
     dataset_name: str
     dataset_version: str
 
@@ -112,6 +129,7 @@ class EvalSummary(DomainModel):
     total_cost_usd: float
 
     average_plan_revisions: float
+
     tag_pass_rates: dict[str, float] = Field(
         default_factory=dict,
     )

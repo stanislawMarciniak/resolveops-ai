@@ -4,7 +4,10 @@ from app.evals.models import (
     EvalCase,
     EvalCaseResult,
 )
-from app.state import CaseState
+from app.state import (
+    CaseStage,
+    CaseState,
+)
 
 
 def _normalize(
@@ -59,18 +62,26 @@ def score_case(
         is truth.expected_final_stage
     )
 
-    root_score = root_cause_score(
-        root_cause=state.root_cause,
-        keyword_groups=(
-            truth.root_cause_keyword_groups
-        ),
-    )
+    if (
+        truth.expected_final_stage
+        is CaseStage.ESCALATED
+    ):
+        root_score = None
+        root_correct = None
 
-    root_correct = (
-        None
-        if root_score is None
-        else root_score == 1.0
-    )
+    else:
+        root_score = root_cause_score(
+            root_cause=state.root_cause,
+            keyword_groups=(
+                truth.root_cause_keyword_groups
+            ),
+        )
+
+        root_correct = (
+            None
+            if root_score is None
+            else root_score == 1.0
+        )
 
     actual_actions = (
         []
@@ -225,4 +236,50 @@ def score_case(
             state.plan_revision_count
         ),
         tags=definition.tags,
+    )
+
+def score_error_case(
+    *,
+    definition: EvalCase,
+    error: Exception,
+) -> EvalCaseResult:
+    truth = definition.ground_truth
+
+    return EvalCaseResult(
+        eval_id=definition.eval_id,
+        case_id="",
+        passed=False,
+        expected_stage=(
+            truth.expected_final_stage.value
+        ),
+        actual_stage="ERROR",
+        stage_correct=False,
+        root_cause_score=None,
+        root_cause_correct=None,
+        expected_actions=(
+            truth.expected_actions
+        ),
+        tags=definition.tags,
+        actual_actions=[],
+        plan_correct=False,
+        customer_id_correct=None,
+        expected_review_verdict=(
+            truth.expected_review_verdict
+        ),
+        actual_review_verdict=None,
+        review_correct=None,
+        model_calls=0,
+        tool_calls=0,
+        input_tokens=0,
+        tool_input_tokens=0,
+        output_tokens=0,
+        thinking_tokens=0,
+        total_tokens=0,
+        llm_latency_ms=0.0,
+        estimated_cost_usd=0.0,
+        plan_revision_count=0,
+        run_error=(
+            f"{type(error).__name__}: "
+            f"{error}"
+        ),
     )

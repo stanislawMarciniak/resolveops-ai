@@ -19,11 +19,13 @@ from app.evals.report import (
 )
 from app.evals.scoring import (
     score_case,
+    score_error_case,
 )
 from app.state import (
     CaseStage,
     CaseState,
 )
+
 
 DEFAULT_DATASET = Path(
     "data/evals/resolveops_eval_v1.json"
@@ -76,33 +78,17 @@ async def run_eval_case(
     return state
 
 
-async def run_dataset(
-    dataset: EvalDataset,
+async def run_single_eval(
     *,
-    limit: int | None = None,
-) -> list[EvalCaseResult]:
-    definitions = dataset.cases
-
-    if limit is not None:
-        definitions = definitions[
-            :limit
-        ]
-
-    results: list[
-        EvalCaseResult
-    ] = []
-
-    total = len(
-        definitions
-    )
-
-    for index, definition in enumerate(
-        definitions,
-        start=1,
-    ):
+    index: int,
+    total: int,
+    definition: EvalCase,
+    semaphore: asyncio.Semaphore,
+) -> tuple[int, EvalCaseResult]:
+    async with semaphore:
         print(
-            f"[{index}/{total}] "
-            f"{definition.eval_id}"
+            f"[{index + 1}/{total}] "
+            f"{definition.eval_id} START"
         )
 
         try:
@@ -117,14 +103,15 @@ async def run_dataset(
 
         except Exception as exc:
             print(
-                f"  ERROR: {exc}"
+                f"[{index + 1}/{total}] "
+                f"{definition.eval_id} "
+                f"ERROR: {exc}"
             )
 
-            continue
-
-        results.append(
-            result
-        )
+            result = score_error_case(
+                definition=definition,
+                error=exc,
+            )
 
         status = (
             "PASS"
@@ -133,13 +120,66 @@ async def run_dataset(
         )
 
         print(
-            f"  {status} "
+            f"[{index + 1}/{total}] "
+            f"{definition.eval_id} "
+            f"{status} "
             f"stage={result.actual_stage} "
             f"calls={result.model_calls} "
             f"cost=${result.estimated_cost_usd:.4f}"
         )
 
-    return results
+        return index, result
+
+
+async def run_dataset(
+    dataset: EvalDataset,
+    *,
+    limit: int | None = None,
+    concurrency: int = 3,
+) -> list[EvalCaseResult]:
+    definitions = dataset.cases
+
+    if limit is not None:
+        definitions = definitions[
+            :limit
+        ]
+
+    if concurrency < 1:
+        raise ValueError(
+            "concurrency must be at least 1"
+        )
+
+    total = len(
+        definitions
+    )
+
+    semaphore = asyncio.Semaphore(
+        concurrency
+    )
+
+    tasks = [
+        run_single_eval(
+            index=index,
+            total=total,
+            definition=definition,
+            semaphore=semaphore,
+        )
+        for index, definition
+        in enumerate(definitions)
+    ]
+
+    completed = await asyncio.gather(
+        *tasks
+    )
+
+    completed.sort(
+        key=lambda item: item[0]
+    )
+
+    return [
+        result
+        for _, result in completed
+    ]
 
 
 async def async_main() -> None:
@@ -163,6 +203,16 @@ async def async_main() -> None:
         default=None,
     )
 
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=3,
+        help=(
+            "Maximum number of eval cases "
+            "running concurrently."
+        ),
+    )
+
     args = parser.parse_args()
 
     dataset = load_dataset(
@@ -172,6 +222,7 @@ async def async_main() -> None:
     results = await run_dataset(
         dataset,
         limit=args.limit,
+        concurrency=args.concurrency,
     )
 
     report = build_report(
@@ -196,6 +247,7 @@ async def async_main() -> None:
 
     print()
     print("=== Evaluation summary ===")
+
     print(
         report.summary.model_dump_json(
             indent=2
@@ -203,6 +255,7 @@ async def async_main() -> None:
     )
 
     print()
+
     print(
         f"Saved: {args.output}"
     )

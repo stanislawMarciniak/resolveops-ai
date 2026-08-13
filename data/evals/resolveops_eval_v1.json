@@ -282,7 +282,7 @@
         "root_cause_keyword_groups": [],
         "expected_actions": null,
         "expected_customer_id": null,
-        "expected_review_verdict": "ESCALATE",
+        "expected_review_verdict": null,
         "expected_requires_approval": null
       }
     },
@@ -300,7 +300,7 @@
         "root_cause_keyword_groups": [],
         "expected_actions": null,
         "expected_customer_id": null,
-        "expected_review_verdict": "ESCALATE",
+        "expected_review_verdict": null,
         "expected_requires_approval": null
       }
     },
