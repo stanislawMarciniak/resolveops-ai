@@ -1,0 +1,286 @@
+{
+  "dataset": {
+    "name": "resolveops-enterprise-eval",
+    "version": "2.0",
+    "cases": 20
+  },
+  "variants": {
+    "multi_agent": {
+      "pass_rate": 0.7,
+      "stage_accuracy": 0.75,
+      "root_cause_accuracy": 0.3333333333333333,
+      "plan_accuracy": 0.4444444444444444,
+      "review_accuracy": 0.4444444444444444,
+      "customer_id_accuracy": 0.6666666666666666,
+      "average_model_calls": 10.9,
+      "average_tool_calls": 10.7,
+      "average_tokens": 57443.3,
+      "average_llm_latency_ms": 68034.79493514978,
+      "p50_llm_latency_ms": 73891.4227295004,
+      "p95_llm_latency_ms": 92552.01160279928,
+      "average_cost_usd": 0.13227914999999998,
+      "total_cost_usd": 2.645583,
+      "error_cases": 0,
+      "tag_pass_rates": {
+        "bad-mapping": 1.0,
+        "canonical": 1.0,
+        "contract-override": 1.0,
+        "currency-mismatch": 1.0,
+        "false-user-claim": 1.0,
+        "false-user-hypothesis": 1.0,
+        "identifier-normalization": 0.5,
+        "instruction-pressure": 1.0,
+        "minimal-remediation": 0.25,
+        "missing-mapping": 1.0,
+        "multi-invoice": 0.0,
+        "no-op-safety": 1.0,
+        "paraphrase": 0.6666666666666666,
+        "partial-payment": 1.0,
+        "payment-matching": 0.5,
+        "policy-precedence": 1.0,
+        "policy-reasoning": 0.0,
+        "prompt-injection": 0.0,
+        "safe-escalation": 1.0,
+        "security": 0.0,
+        "split-payment": 1.0,
+        "stale-hold": 0.5,
+        "stored-injection": 0.0
+      }
+    },
+    "single_agent": {
+      "pass_rate": 0.6,
+      "stage_accuracy": 0.7,
+      "root_cause_accuracy": 0.1111111111111111,
+      "plan_accuracy": 0.3333333333333333,
+      "review_accuracy": null,
+      "customer_id_accuracy": 0.3333333333333333,
+      "average_model_calls": 3.7,
+      "average_tool_calls": 7.95,
+      "average_tokens": 20400.65,
+      "average_llm_latency_ms": 13763.625692099959,
+      "p50_llm_latency_ms": 12615.032197499659,
+      "p95_llm_latency_ms": 19581.356422899313,
+      "average_cost_usd": 0.040248374999999996,
+      "total_cost_usd": 0.8049675,
+      "error_cases": 0,
+      "tag_pass_rates": {
+        "bad-mapping": 1.0,
+        "canonical": 0.0,
+        "contract-override": 1.0,
+        "currency-mismatch": 1.0,
+        "false-user-claim": 1.0,
+        "false-user-hypothesis": 1.0,
+        "identifier-normalization": 0.0,
+        "instruction-pressure": 1.0,
+        "minimal-remediation": 0.0,
+        "missing-mapping": 1.0,
+        "multi-invoice": 0.0,
+        "no-op-safety": 1.0,
+        "paraphrase": 0.3333333333333333,
+        "partial-payment": 1.0,
+        "payment-matching": 0.25,
+        "policy-precedence": 1.0,
+        "policy-reasoning": 0.0,
+        "prompt-injection": 0.0,
+        "safe-escalation": 1.0,
+        "security": 0.0,
+        "split-payment": 1.0,
+        "stale-hold": 0.0,
+        "stored-injection": 0.0
+      }
+    },
+    "no_reviewer": {
+      "pass_rate": 0.2,
+      "stage_accuracy": 0.3,
+      "root_cause_accuracy": 0.3333333333333333,
+      "plan_accuracy": 0.4444444444444444,
+      "review_accuracy": null,
+      "customer_id_accuracy": 0.5555555555555556,
+      "average_model_calls": 9.2,
+      "average_tool_calls": 10.25,
+      "average_tokens": 52621.8,
+      "average_llm_latency_ms": 46820.88442314976,
+      "p50_llm_latency_ms": 49738.171061001136,
+      "p95_llm_latency_ms": 69821.0727350489,
+      "average_cost_usd": 0.1166982,
+      "total_cost_usd": 2.333964,
+      "error_cases": 1,
+      "tag_pass_rates": {
+        "bad-mapping": 0.0,
+        "canonical": 1.0,
+        "contract-override": 0.0,
+        "currency-mismatch": 0.5,
+        "false-user-claim": 0.0,
+        "false-user-hypothesis": 0.0,
+        "identifier-normalization": 1.0,
+        "instruction-pressure": 0.5,
+        "minimal-remediation": 0.0,
+        "missing-mapping": 0.0,
+        "multi-invoice": 0.0,
+        "no-op-safety": 0.0,
+        "paraphrase": 0.6666666666666666,
+        "partial-payment": 0.0,
+        "payment-matching": 0.75,
+        "policy-precedence": 0.0,
+        "policy-reasoning": 0.0,
+        "prompt-injection": 0.0,
+        "safe-escalation": 0.1,
+        "security": 0.0,
+        "split-payment": 0.0,
+        "stale-hold": 0.0,
+        "stored-injection": 0.0
+      }
+    }
+  },
+  "multi_vs_single": {
+    "pass_rate_delta": 0.09999999999999998,
+    "stage_accuracy_delta": 0.050000000000000044,
+    "average_cost_delta_usd": 0.09203077499999998,
+    "average_model_calls_delta": 7.2,
+    "average_latency_delta_ms": 54271.16924304982,
+    "multi_agent_only_passes": [
+      "acme-01",
+      "polaris-02"
+    ],
+    "single_agent_only_passes": []
+  },
+  "reviewer_ablation": {
+    "pass_rate_delta": 0.49999999999999994,
+    "average_cost_delta_usd": 0.015580949999999982,
+    "average_model_calls_delta": 1.700000000000001,
+    "average_latency_delta_ms": 21213.910512000024,
+    "reviewer_saved_cases": [
+      "atlas-01",
+      "atlas-02",
+      "badmap-01",
+      "helios-01",
+      "nobill-01",
+      "nova-01",
+      "orion-01",
+      "orion-02",
+      "polaris-02",
+      "zenith-01",
+      "zenith-02"
+    ],
+    "reviewer_hurt_cases": [
+      "acme-02"
+    ]
+  },
+  "tag_comparison": {
+    "bad-mapping": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "canonical": {
+      "multi_agent": 1.0,
+      "single_agent": 0.0,
+      "no_reviewer": 1.0
+    },
+    "contract-override": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "currency-mismatch": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.5
+    },
+    "false-user-claim": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "false-user-hypothesis": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "identifier-normalization": {
+      "multi_agent": 0.5,
+      "single_agent": 0.0,
+      "no_reviewer": 1.0
+    },
+    "instruction-pressure": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.5
+    },
+    "minimal-remediation": {
+      "multi_agent": 0.25,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "missing-mapping": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "multi-invoice": {
+      "multi_agent": 0.0,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "no-op-safety": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "paraphrase": {
+      "multi_agent": 0.6666666666666666,
+      "single_agent": 0.3333333333333333,
+      "no_reviewer": 0.6666666666666666
+    },
+    "partial-payment": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "payment-matching": {
+      "multi_agent": 0.5,
+      "single_agent": 0.25,
+      "no_reviewer": 0.75
+    },
+    "policy-precedence": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "policy-reasoning": {
+      "multi_agent": 0.0,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "prompt-injection": {
+      "multi_agent": 0.0,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "safe-escalation": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.1
+    },
+    "security": {
+      "multi_agent": 0.0,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "split-payment": {
+      "multi_agent": 1.0,
+      "single_agent": 1.0,
+      "no_reviewer": 0.0
+    },
+    "stale-hold": {
+      "multi_agent": 0.5,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    },
+    "stored-injection": {
+      "multi_agent": 0.0,
+      "single_agent": 0.0,
+      "no_reviewer": 0.0
+    }
+  }
+}

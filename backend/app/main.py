@@ -8,6 +8,12 @@ from pydantic import BaseModel
 from app.api.cases import (
     router as cases_router,
 )
+from app.api.evaluations import (
+    router as evaluations_router,
+)
+from app.api.system import (
+    router as system_router,
+)
 from app.config import get_settings
 from app.observability.telemetry import (
     configure_telemetry,
@@ -46,11 +52,17 @@ instrument_fastapi(
 app.include_router(
     cases_router
 )
+app.include_router(
+    evaluations_router
+)
+app.include_router(
+    system_router
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        settings.frontend_origin,
+        "http://localhost:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],

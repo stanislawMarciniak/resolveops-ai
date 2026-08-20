@@ -104,3 +104,63 @@ class CaseStateRepository:
             )
 
         return state
+
+    def list(
+        self,
+        *,
+        customer_id: str | None = None,
+        stage: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[CaseState]:
+        with self._session_factory() as session:
+            query = session.query(CaseStateRecord)
+
+            if customer_id is not None:
+                query = query.filter(
+                    CaseStateRecord.customer_id
+                    == customer_id
+                )
+
+            if stage is not None:
+                query = query.filter(
+                    CaseStateRecord.stage == stage
+                )
+
+            records = (
+                query.order_by(
+                    CaseStateRecord.updated_at.desc()
+                )
+                .offset(max(offset, 0))
+                .limit(max(min(limit, 500), 1))
+                .all()
+            )
+
+            return [
+                CaseState.model_validate(
+                    record.payload
+                )
+                for record in records
+            ]
+
+    def count(
+        self,
+        *,
+        customer_id: str | None = None,
+        stage: str | None = None,
+    ) -> int:
+        with self._session_factory() as session:
+            query = session.query(CaseStateRecord)
+
+            if customer_id is not None:
+                query = query.filter(
+                    CaseStateRecord.customer_id
+                    == customer_id
+                )
+
+            if stage is not None:
+                query = query.filter(
+                    CaseStateRecord.stage == stage
+                )
+
+            return query.count()

@@ -16,7 +16,6 @@ from app.approvals.service import (
     ApprovalService,
 )
 from app.auth.google import (
-    get_current_user,
     require_operator,
 )
 from app.auth.models import (
@@ -118,16 +117,43 @@ class CaseMetricsResponse(BaseModel):
 
     verification_success: bool | None
 
+class CaseListResponse(BaseModel):
+    total: int
+    items: list[CaseState]
+
+
+@router.get(
+    "",
+    response_model=CaseListResponse,
+)
+async def list_cases(
+    customer_id: str | None = None,
+    stage: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> CaseListResponse:
+    items = repository.list(
+        customer_id=customer_id,
+        stage=stage,
+        limit=limit,
+        offset=offset,
+    )
+    total = repository.count(
+        customer_id=customer_id,
+        stage=stage,
+    )
+    return CaseListResponse(
+        total=total,
+        items=items,
+    )
+
+
 @router.get(
     "/{case_id}",
     response_model=CaseState,
 )
 async def get_case(
     case_id: UUID,
-    _: Annotated[
-        AuthenticatedUser,
-        Depends(get_current_user),
-    ],
 ) -> CaseState:
     try:
         return repository.require(
@@ -235,10 +261,6 @@ async def verify_case(
 )
 async def get_case_metrics(
     case_id: UUID,
-    _: Annotated[
-        AuthenticatedUser,
-        Depends(get_current_user),
-    ],
 ) -> CaseMetricsResponse:
     try:
         state = repository.require(

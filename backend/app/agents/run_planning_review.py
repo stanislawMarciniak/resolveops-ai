@@ -32,6 +32,8 @@ def parse_args() -> argparse.Namespace:
 
 async def run_planning_review_case(
     case_id: UUID | str,
+    *,
+    review_enabled: bool = True,
 ) -> CaseState:
     settings = get_settings()
 
@@ -47,7 +49,8 @@ async def run_planning_review_case(
     )
 
     return await workflow.run(
-        case_id
+        case_id,
+        review_enabled=review_enabled,
     )
 
 

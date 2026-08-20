@@ -2,6 +2,7 @@ from app.evals.models import (
     EvalCaseResult,
     EvalReport,
     EvalSummary,
+    EvalVariant,
 )
 
 
@@ -13,6 +14,23 @@ def _average(
 
     return sum(values) / len(
         values
+    )
+
+
+def _optional_average(
+    values: list[float | None],
+) -> float | None:
+    applicable = [
+        value
+        for value in values
+        if value is not None
+    ]
+
+    if not applicable:
+        return None
+
+    return _average(
+        applicable
     )
 
 
@@ -79,8 +97,47 @@ def _percentile(
     )
 
 
+def _tag_rates(
+    *,
+    results: list[EvalCaseResult],
+    strict: bool,
+) -> dict[str, float]:
+    all_tags = sorted(
+        {
+            tag
+            for result in results
+            for tag in result.tags
+        }
+    )
+
+    rates: dict[str, float] = {}
+
+    for tag in all_tags:
+        tagged_results = [
+            result
+            for result in results
+            if tag in result.tags
+        ]
+
+        rates[tag] = (
+            sum(
+                1
+                for result in tagged_results
+                if (
+                    result.strict_passed
+                    if strict
+                    else result.passed
+                )
+            )
+            / len(tagged_results)
+        )
+
+    return rates
+
+
 def build_report(
     *,
+    variant: EvalVariant,
     dataset_name: str,
     dataset_version: str,
     results: list[EvalCaseResult],
@@ -93,6 +150,12 @@ def build_report(
         1
         for result in results
         if result.passed
+    )
+
+    strict_passed_cases = sum(
+        1
+        for result in results
+        if result.strict_passed
     )
 
     stage_accuracy = (
@@ -117,33 +180,9 @@ def build_report(
         result.estimated_cost_usd
         for result in results
     ]
-    all_tags = sorted(
-        {
-            tag
-            for result in results
-            for tag in result.tags
-        }
-    )
-
-    tag_pass_rates: dict[str, float] = {}
-
-    for tag in all_tags:
-        tagged_results = [
-            result
-            for result in results
-            if tag in result.tags
-        ]
-
-        tag_pass_rates[tag] = (
-            sum(
-                1
-                for result in tagged_results
-                if result.passed
-            )
-            / len(tagged_results)
-        )
 
     summary = EvalSummary(
+        variant=variant,
         dataset_name=dataset_name,
         dataset_version=(
             dataset_version
@@ -158,12 +197,30 @@ def build_report(
                 / total_cases
             )
         ),
+        strict_passed_cases=(
+            strict_passed_cases
+        ),
+        strict_pass_rate=(
+            0.0
+            if total_cases == 0
+            else (
+                strict_passed_cases
+                / total_cases
+            )
+        ),
         stage_accuracy=stage_accuracy,
         root_cause_accuracy=(
             _optional_accuracy(
                 [
-                    result
-                    .root_cause_correct
+                    result.root_cause_correct
+                    for result in results
+                ]
+            )
+        ),
+        average_root_cause_score=(
+            _optional_average(
+                [
+                    result.root_cause_score
                     for result in results
                 ]
             )
@@ -187,8 +244,15 @@ def build_report(
         customer_id_accuracy=(
             _optional_accuracy(
                 [
-                    result
-                    .customer_id_correct
+                    result.customer_id_correct
+                    for result in results
+                ]
+            )
+        ),
+        approval_accuracy=(
+            _optional_accuracy(
+                [
+                    result.approval_correct
                     for result in results
                 ]
             )
@@ -244,17 +308,32 @@ def build_report(
         total_cost_usd=sum(
             costs
         ),
-        tag_pass_rates=tag_pass_rates,
+        tag_pass_rates=(
+            _tag_rates(
+                results=results,
+                strict=False,
+            )
+        ),
+        tag_strict_pass_rates=(
+            _tag_rates(
+                results=results,
+                strict=True,
+            )
+        ),
         average_plan_revisions=(
             _average(
                 [
                     float(
-                        result
-                        .plan_revision_count
+                        result.plan_revision_count
                     )
                     for result in results
                 ]
             )
+        ),
+        error_cases=sum(
+            1
+            for result in results
+            if result.run_error is not None
         ),
     )
 

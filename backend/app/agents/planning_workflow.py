@@ -70,6 +70,8 @@ class PlanningReviewWorkflow:
     async def run(
         self,
         case_id: UUID | str,
+        *,
+        review_enabled: bool = True,
     ) -> CaseState:
         state = self._repository.require(
             case_id
@@ -115,6 +117,14 @@ class PlanningReviewWorkflow:
                 continue
 
             if state.stage is CaseStage.REVIEW:
+                if not review_enabled:
+                    return (
+                        self
+                        ._accept_plan_without_review(
+                            state
+                        )
+                    )
+
                 state = await self._run_reviewer(
                     state
                 )
@@ -230,6 +240,50 @@ class PlanningReviewWorkflow:
 
         return self._repository.save(
             updated
+        )
+    
+    def _accept_plan_without_review(
+        self,
+        state: CaseState,
+    ) -> CaseState:
+        plan = state.resolution_plan
+
+        if plan is None:
+            return self._repository.save(
+                state.model_copy(
+                    update={
+                        "stage": (
+                            CaseStage.ESCALATED
+                        ),
+                        "review": None,
+                        "approval": None,
+                    }
+                )
+            )
+
+        next_stage = (
+            CaseStage.AWAITING_APPROVAL
+            if plan.requires_approval
+            else CaseStage.EXECUTING
+        )
+
+        approval = (
+            build_pending_approval(plan)
+            if (
+                next_stage
+                is CaseStage.AWAITING_APPROVAL
+            )
+            else None
+        )
+
+        return self._repository.save(
+            state.model_copy(
+                update={
+                    "stage": next_stage,
+                    "review": None,
+                    "approval": approval,
+                }
+            )
         )
 
     async def _run_reviewer(

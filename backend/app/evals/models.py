@@ -27,9 +27,7 @@ class EvalGroundTruth(DomainModel):
 
     expected_review_verdict: str | None = None
 
-    expected_requires_approval: bool | None = (
-        None
-    )
+    expected_requires_approval: bool | None = None
 
 
 class EvalCase(DomainModel):
@@ -56,7 +54,14 @@ class EvalCaseResult(DomainModel):
     eval_id: str
     case_id: str
 
+    # Primary metric: operational end-to-end success.
+    # Root-cause wording is intentionally not a gate.
     passed: bool
+
+    # Historical strict metric: operational success
+    # plus exact root-cause keyword coverage when
+    # root-cause scoring applies.
+    strict_passed: bool
 
     expected_stage: str
     actual_stage: str
@@ -66,16 +71,17 @@ class EvalCaseResult(DomainModel):
     root_cause_correct: bool | None = None
 
     expected_actions: list[str] | None = None
-
     tags: list[str] = Field(
         default_factory=list,
     )
-
     actual_actions: list[str]
-
     plan_correct: bool | None = None
 
     customer_id_correct: bool | None = None
+
+    expected_requires_approval: bool | None = None
+    actual_requires_approval: bool | None = None
+    approval_correct: bool | None = None
 
     expected_review_verdict: str | None = None
     actual_review_verdict: str | None = None
@@ -95,27 +101,34 @@ class EvalCaseResult(DomainModel):
     estimated_cost_usd: float
 
     plan_revision_count: int
-
     run_error: str | None = None
 
 
 class EvalSummary(DomainModel):
-    variant: EvalVariant = (
-        EvalVariant.MULTI_AGENT
-    )
+    variant: EvalVariant = EvalVariant.MULTI_AGENT
+    scoring_version: str = "2.0-operational-primary"
 
     dataset_name: str
     dataset_version: str
 
     total_cases: int
+
+    # Primary operational metric.
     passed_cases: int
     pass_rate: float
 
+    # Secondary strict metric kept for transparency
+    # and backwards comparison with the old scorer.
+    strict_passed_cases: int
+    strict_pass_rate: float
+
     stage_accuracy: float
     root_cause_accuracy: float | None
+    average_root_cause_score: float | None
     plan_accuracy: float | None
     review_accuracy: float | None
     customer_id_accuracy: float | None
+    approval_accuracy: float | None
 
     average_model_calls: float
     average_tool_calls: float
@@ -129,8 +142,15 @@ class EvalSummary(DomainModel):
     total_cost_usd: float
 
     average_plan_revisions: float
+    error_cases: int
 
+    # Primary operational success by tag.
     tag_pass_rates: dict[str, float] = Field(
+        default_factory=dict,
+    )
+
+    # Strict success by tag, retained separately.
+    tag_strict_pass_rates: dict[str, float] = Field(
         default_factory=dict,
     )
 

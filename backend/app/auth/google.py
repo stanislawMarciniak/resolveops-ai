@@ -60,6 +60,19 @@ async def get_current_user(
         Depends(bearer_scheme),
     ],
 ) -> AuthenticatedUser:
+    settings = get_settings()
+
+    # Local/demo reads work without Google OAuth when unset.
+    if (
+        credentials is None
+        and not settings.google_oauth_client_id
+    ):
+        return AuthenticatedUser(
+            subject="local-dev",
+            email="dev@localhost",
+            role=UserRole.VIEWER,
+        )
+
     if credentials is None:
         raise HTTPException(
             status_code=(

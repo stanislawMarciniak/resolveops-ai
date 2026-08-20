@@ -13,6 +13,7 @@ from app.evals.models import (
     EvalCase,
     EvalCaseResult,
     EvalDataset,
+    EvalVariant,
 )
 from app.evals.report import (
     build_report,
@@ -21,19 +22,20 @@ from app.evals.scoring import (
     score_case,
     score_error_case,
 )
+from app.evals.single_agent import (
+    run_single_agent_case,
+)
 from app.state import (
     CaseStage,
     CaseState,
 )
 
-
 DEFAULT_DATASET = Path(
     "data/evals/resolveops_eval_v1.json"
 )
 
-DEFAULT_OUTPUT = Path(
-    "data/evals/results/"
-    "multi_agent_v1.json"
+RESULTS_DIR = Path(
+    "data/evals/results"
 )
 
 
@@ -53,9 +55,11 @@ def load_dataset(
 
 async def run_eval_case(
     definition: EvalCase,
+    *,
+    variant: EvalVariant,
 ) -> CaseState:
-    state = (
-        await run_investigation_case(
+    if variant is EvalVariant.SINGLE_AGENT:
+        return await run_single_agent_case(
             customer_id=(
                 definition.customer_id
             ),
@@ -63,19 +67,26 @@ async def run_eval_case(
                 definition.description
             ),
         )
+
+    state = await run_investigation_case(
+        customer_id=(
+            definition.customer_id
+        ),
+        description=(
+            definition.description
+        ),
     )
 
-    if (
-        state.stage
-        is CaseStage.PLANNING
-    ):
-        state = (
-            await run_planning_review_case(
-                state.case_id
-            )
-        )
+    if state.stage is not CaseStage.PLANNING:
+        return state
 
-    return state
+    return await run_planning_review_case(
+        state.case_id,
+        review_enabled=(
+            variant
+            is EvalVariant.MULTI_AGENT
+        ),
+    )
 
 
 async def run_single_eval(
@@ -83,6 +94,7 @@ async def run_single_eval(
     index: int,
     total: int,
     definition: EvalCase,
+    variant: EvalVariant,
     semaphore: asyncio.Semaphore,
 ) -> tuple[int, EvalCaseResult]:
     async with semaphore:
@@ -91,14 +103,23 @@ async def run_single_eval(
             f"{definition.eval_id} START"
         )
 
+        evaluate_review = (
+            variant
+            is EvalVariant.MULTI_AGENT
+        )
+
         try:
             state = await run_eval_case(
-                definition
+                definition,
+                variant=variant,
             )
 
             result = score_case(
                 definition=definition,
                 state=state,
+                evaluate_review=(
+                    evaluate_review
+                ),
             )
 
         except Exception as exc:
@@ -111,6 +132,9 @@ async def run_single_eval(
             result = score_error_case(
                 definition=definition,
                 error=exc,
+                evaluate_review=(
+                    evaluate_review
+                ),
             )
 
         status = (
@@ -119,10 +143,17 @@ async def run_single_eval(
             else "FAIL"
         )
 
+        strict_status = (
+            "PASS"
+            if result.strict_passed
+            else "FAIL"
+        )
+
         print(
             f"[{index + 1}/{total}] "
             f"{definition.eval_id} "
             f"{status} "
+            f"strict={strict_status} "
             f"stage={result.actual_stage} "
             f"calls={result.model_calls} "
             f"cost=${result.estimated_cost_usd:.4f}"
@@ -134,10 +165,25 @@ async def run_single_eval(
 async def run_dataset(
     dataset: EvalDataset,
     *,
+    variant: EvalVariant,
     limit: int | None = None,
     concurrency: int = 3,
+    eval_case: str | None = None,
 ) -> list[EvalCaseResult]:
     definitions = dataset.cases
+
+    if eval_case is not None:
+        definitions = [
+            definition
+            for definition in definitions
+            if definition.eval_id == eval_case
+        ]
+
+        if not definitions:
+            raise ValueError(
+                "Unknown eval case: "
+                f"{eval_case}"
+            )
 
     if limit is not None:
         definitions = definitions[
@@ -162,6 +208,7 @@ async def run_dataset(
             index=index,
             total=total,
             definition=definition,
+            variant=variant,
             semaphore=semaphore,
         )
         for index, definition
@@ -182,6 +229,35 @@ async def run_dataset(
     ]
 
 
+def default_output_path(
+    *,
+    variant: EvalVariant,
+    limit: int | None,
+    eval_case: str | None,
+) -> Path:
+    if eval_case is not None:
+        return (
+            RESULTS_DIR
+            / "smoke"
+            / f"{variant.value}_{eval_case}.json"
+        )
+
+    if limit is not None:
+        return (
+            RESULTS_DIR
+            / "smoke"
+            / (
+                f"{variant.value}_"
+                f"limit_{limit}.json"
+            )
+        )
+
+    return (
+        RESULTS_DIR
+        / f"{variant.value}.json"
+    )
+
+
 async def async_main() -> None:
     parser = argparse.ArgumentParser()
 
@@ -192,14 +268,28 @@ async def async_main() -> None:
     )
 
     parser.add_argument(
+        "--variant",
+        type=EvalVariant,
+        choices=list(EvalVariant),
+        default=EvalVariant.MULTI_AGENT,
+    )
+
+    parser.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_OUTPUT,
+        default=None,
     )
 
     parser.add_argument(
         "--limit",
         type=int,
+        default=None,
+    )
+
+    parser.add_argument(
+        "--case",
+        dest="eval_case",
+        type=str,
         default=None,
     )
 
@@ -221,11 +311,14 @@ async def async_main() -> None:
 
     results = await run_dataset(
         dataset,
+        variant=args.variant,
         limit=args.limit,
         concurrency=args.concurrency,
+        eval_case=args.eval_case,
     )
 
     report = build_report(
+        variant=args.variant,
         dataset_name=dataset.name,
         dataset_version=(
             dataset.version
@@ -233,12 +326,22 @@ async def async_main() -> None:
         results=results,
     )
 
-    args.output.parent.mkdir(
+    output = (
+        args.output
+        if args.output is not None
+        else default_output_path(
+            variant=args.variant,
+            limit=args.limit,
+            eval_case=args.eval_case,
+        )
+    )
+
+    output.parent.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    args.output.write_text(
+    output.write_text(
         report.model_dump_json(
             indent=2
         ),
@@ -257,7 +360,7 @@ async def async_main() -> None:
     print()
 
     print(
-        f"Saved: {args.output}"
+        f"Saved: {output}"
     )
 
 

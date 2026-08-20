@@ -54,6 +54,7 @@ def score_case(
     *,
     definition: EvalCase,
     state: CaseState,
+    evaluate_review: bool = True,
 ) -> EvalCaseResult:
     truth = definition.ground_truth
 
@@ -62,13 +63,16 @@ def score_case(
         is truth.expected_final_stage
     )
 
+    # Root-cause wording is evaluated only for cases
+    # expected to proceed toward remediation. For
+    # intentional escalations, the operational choice
+    # to stop automation is the primary target.
     if (
         truth.expected_final_stage
         is CaseStage.ESCALATED
     ):
         root_score = None
         root_correct = None
-
     else:
         root_score = root_cause_score(
             root_cause=state.root_cause,
@@ -103,9 +107,7 @@ def score_case(
             == truth.expected_actions
         )
 
-    customer_id_correct: (
-        bool | None
-    ) = None
+    customer_id_correct: bool | None = None
 
     if (
         truth.expected_customer_id
@@ -123,6 +125,23 @@ def score_case(
                 in state.resolution_plan.actions
             )
 
+    actual_requires_approval = (
+        None
+        if state.resolution_plan is None
+        else state.resolution_plan.requires_approval
+    )
+
+    approval_correct: bool | None = None
+
+    if (
+        truth.expected_requires_approval
+        is not None
+    ):
+        approval_correct = (
+            actual_requires_approval
+            is truth.expected_requires_approval
+        )
+
     actual_review_verdict = (
         None
         if state.review is None
@@ -132,7 +151,8 @@ def score_case(
     review_correct: bool | None = None
 
     if (
-        truth.expected_review_verdict
+        evaluate_review
+        and truth.expected_review_verdict
         is not None
     ):
         review_correct = (
@@ -140,43 +160,50 @@ def score_case(
             == truth.expected_review_verdict
         )
 
-    approval_correct = True
-
-    if (
-        truth.expected_requires_approval
-        is not None
-    ):
-        approval_correct = (
-            state.resolution_plan
-            is not None
-            and (
-                state.resolution_plan
-                .requires_approval
-                is truth
-                .expected_requires_approval
-            )
-        )
-
-    required_checks = [
+    # Primary methodology: operational success.
+    # The final stage, mutation plan, canonical tool
+    # arguments and approval requirement determine
+    # whether the system made the right operational
+    # decision. Exact root-cause wording remains a
+    # separate diagnosis-quality metric.
+    operational_checks = [
         stage_correct,
-        approval_correct,
     ]
 
     if plan_correct is not None:
-        required_checks.append(
+        operational_checks.append(
             plan_correct
         )
 
-    if root_correct is not None:
-        required_checks.append(
-            root_correct
-        )
-
     if customer_id_correct is not None:
-        required_checks.append(
+        operational_checks.append(
             customer_id_correct
         )
 
+    if approval_correct is not None:
+        operational_checks.append(
+            approval_correct
+        )
+
+    passed = all(
+        operational_checks
+    )
+
+    # Strict metric preserves the previous behavior:
+    # exact root-cause keyword coverage is an
+    # additional binary gate when applicable.
+    strict_checks = list(
+        operational_checks
+    )
+
+    if root_correct is not None:
+        strict_checks.append(
+            root_correct
+        )
+
+    strict_passed = all(
+        strict_checks
+    )
 
     total_tokens = (
         state.input_tokens
@@ -190,9 +217,8 @@ def score_case(
         case_id=str(
             state.case_id
         ),
-        passed=all(
-            required_checks
-        ),
+        passed=passed,
+        strict_passed=strict_passed,
         expected_stage=(
             truth.expected_final_stage.value
         ),
@@ -208,6 +234,13 @@ def score_case(
         customer_id_correct=(
             customer_id_correct
         ),
+        expected_requires_approval=(
+            truth.expected_requires_approval
+        ),
+        actual_requires_approval=(
+            actual_requires_approval
+        ),
+        approval_correct=approval_correct,
         expected_review_verdict=(
             truth.expected_review_verdict
         ),
@@ -238,36 +271,81 @@ def score_case(
         tags=definition.tags,
     )
 
+
 def score_error_case(
     *,
     definition: EvalCase,
     error: Exception,
+    evaluate_review: bool = True,
 ) -> EvalCaseResult:
     truth = definition.ground_truth
+
+    root_applicable = (
+        truth.expected_final_stage
+        is not CaseStage.ESCALATED
+        and bool(
+            truth.root_cause_keyword_groups
+        )
+    )
 
     return EvalCaseResult(
         eval_id=definition.eval_id,
         case_id="",
         passed=False,
+        strict_passed=False,
         expected_stage=(
             truth.expected_final_stage.value
         ),
         actual_stage="ERROR",
         stage_correct=False,
-        root_cause_score=None,
-        root_cause_correct=None,
+        root_cause_score=(
+            0.0
+            if root_applicable
+            else None
+        ),
+        root_cause_correct=(
+            False
+            if root_applicable
+            else None
+        ),
         expected_actions=(
             truth.expected_actions
         ),
         tags=definition.tags,
         actual_actions=[],
-        plan_correct=False,
-        customer_id_correct=None,
+        plan_correct=(
+            False
+            if truth.expected_actions is not None
+            else None
+        ),
+        customer_id_correct=(
+            False
+            if truth.expected_customer_id is not None
+            else None
+        ),
+        expected_requires_approval=(
+            truth.expected_requires_approval
+        ),
+        actual_requires_approval=None,
+        approval_correct=(
+            False
+            if truth.expected_requires_approval
+            is not None
+            else None
+        ),
         expected_review_verdict=(
             truth.expected_review_verdict
         ),
         actual_review_verdict=None,
-        review_correct=None,
+        review_correct=(
+            False
+            if (
+                evaluate_review
+                and truth.expected_review_verdict
+                is not None
+            )
+            else None
+        ),
         model_calls=0,
         tool_calls=0,
         input_tokens=0,
